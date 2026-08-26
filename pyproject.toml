@@ -1,0 +1,25 @@
+[project]
+name = "luca-agent-core"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Luca", email = "luca.narbone@gmail.com" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.141.1",
+    "langchain-core>=1.6.0",
+    "langchain-openai>=1.6.0",
+    "langgraph>=1.2.11",
+    "pydantic-settings>=2.15.0",
+    "python-dotenv>=1.2.3",
+    "uvicorn[standard]>=0.52.4",
+]
+
+[project.scripts]
+luca-agent-core = "luca_agent_core:main"
+
+[build-system]
+requires = ["uv_build>=0.12.6,<0.13.0"]
+build-backend = "uv_build"
