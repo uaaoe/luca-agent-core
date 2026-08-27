@@ -1,6 +1,8 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
+import socket
+
 from app.config import settings
 from app.agent import stream_agent_execution
 
@@ -16,7 +18,12 @@ app.add_middleware(
 
 @app.get("/health")
 def health_check():
-    return {"status": "ok", "app": "luca-agent-core", "env": settings.app_env}
+    return {
+        "status": "ok",
+        "app": "luca-agent-core",
+        "env": settings.app_env,
+        "container_id": socket.gethostname()  # Returns Docker container ID inside container
+    }
 
 @app.post("/stream")
 async def run_pipeline(request: Request):
