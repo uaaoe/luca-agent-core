@@ -79,7 +79,7 @@ curl http://localhost:8000/health
 ```bash
 curl -N -X POST http://localhost:8000/stream \
   -H "Content-Type: application/json" \
-  -d '{"message": "Run Barcelona pipeline"}'
+  -d '{"message": "What is the weather in Barcelona right now?"}'
 ```
 
 ---
