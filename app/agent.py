@@ -98,13 +98,13 @@ def should_continue(state: AgentState) -> Literal["tools", "__end__"]:
     if isinstance(last_message, AIMessage) and bool(getattr(last_message, "tool_calls", None)):
         return "tools"
     
-    return END
+    return "__end__"
 
 
 # ---------------------------------------------------------------------------
 # 4. Assemble Graph with In-Memory Checkpointer
 # ---------------------------------------------------------------------------
-workflow = StateGraph(AgentState)
+workflow = StateGraph(AgentState)  # type: ignore[bad-specialization]
 
 workflow.add_node("agent", call_model)
 workflow.add_node("tools", execute_tools)
