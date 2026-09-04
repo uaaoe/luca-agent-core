@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SentinelGraph — Deterministic Agent Runtime &amp; HITL Guard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #090d16;
+      --bg-card: rgba(18, 26, 43, 0.75);
+      --bg-card-hover: rgba(26, 38, 64, 0.85);
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --border-active: rgba(99, 102, 241, 0.4);
+      --text-main: #f1f5f9;
+      --text-muted: #94a3b8;
+      --accent-indigo: #6366f1;
+      --accent-cyan: #06b6d4;
+      --accent-emerald: #10b981;
+      --accent-amber: #f59e0b;
+      --accent-rose: #f43f5e;
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg-dark);
+      background-image: radial-gradient(circle at 50% 0%, rgba(99, 102, 241, 0.15), transparent 50%),
+                        radial-gradient(circle at 85% 85%, rgba(6, 182, 212, 0.08), transparent 40%);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+
+    /* Top Navigation */
+    header {
+      padding: 1rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-subtle);
+      background: rgba(9, 13, 22, 0.85);
+      backdrop-filter: blur(12px);
+      position: sticky;
+      top: 0;
+      z-index: 40;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .brand-icon {
+      width: 36px;
+      height: 36px;
+      background: linear-gradient(135deg, var(--accent-indigo), var(--accent-cyan));
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 20px rgba(99, 102, 241, 0.4);
+    }
+    .brand-title {
+      font-size: 1.2rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    .brand-subtitle {
+      font-size: 0.75rem;
+      color: var(--accent-cyan);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 600;
+    }
+    .header-badges {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .badge {
+      font-size: 0.75rem;
+      padding: 0.3rem 0.65rem;
+      border-radius: 9999px;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      border: 1px solid var(--border-subtle);
+      background: rgba(255, 255, 255, 0.03);
+    }
+    .badge-sandbox {
+      background: rgba(245, 158, 11, 0.12);
+      border-color: rgba(245, 158, 11, 0.3);
+      color: #fbbf24;
+      font-weight: 600;
+    }
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent-emerald);
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(1.2); }
+    }
+
+    /* Main Container */
+    main {
+      flex: 1;
+      padding: 1.5rem 2rem;
+      display: grid;
+      grid-template-columns: 1.15fr 1fr;
+      gap: 1.5rem;
+      max-width: 1700px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    /* Panels */
+    .panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      backdrop-filter: blur(16px);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    }
+    .panel-header {
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(255, 255, 255, 0.02);
+    }
+    .panel-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    /* Interactive Console */
+    .console-content {
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+      flex: 1;
+    }
+    .section-label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+    }
+    .presets-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.65rem;
+    }
+    .preset-card {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      padding: 0.75rem;
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.2s ease;
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+    }
+    .preset-card:hover {
+      background: var(--bg-card-hover);
+      border-color: var(--border-active);
+      transform: translateY(-1px);
+    }
+    .preset-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .preset-name {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+    .preset-tag {
+      font-size: 0.65rem;
+      padding: 0.15rem 0.45rem;
+      border-radius: 4px;
+      font-weight: 600;
+    }
+    .tag-safe { background: rgba(16, 185, 129, 0.15); color: #34d399; }
+    .tag-guarded { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
+    .tag-critical { background: rgba(244, 63, 94, 0.15); color: #fb7185; }
+    .preset-desc {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      line-height: 1.3;
+    }
+
+    /* Input Box */
+    .input-wrapper {
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+      margin-top: auto;
+    }
+    .input-bar {
+      display: flex;
+      gap: 0.5rem;
+    }
+    textarea {
+      flex: 1;
+      background: rgba(10, 15, 26, 0.9);
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      padding: 0.75rem 1rem;
+      color: var(--text-main);
+      font-family: inherit;
+      font-size: 0.9rem;
+      resize: none;
+      height: 60px;
+      transition: border-color 0.2s;
+    }
+    textarea:focus {
+      outline: none;
+      border-color: var(--accent-indigo);
+      box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+    }
+    .btn {
+      padding: 0 1.25rem;
+      background: linear-gradient(135deg, var(--accent-indigo), #4f46e5);
+      border: none;
+      border-radius: 10px;
+      color: white;
+      font-weight: 600;
+      font-size: 0.85rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+      transition: all 0.2s ease;
+    }
+    .btn:hover:not(:disabled) {
+      filter: brightness(1.15);
+      box-shadow: 0 0 15px rgba(99, 102, 241, 0.5);
+    }
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* Right Column: Pipeline Visualizer */
+    .pipeline-container {
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .nodes-flow {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.75rem;
+      position: relative;
+    }
+    .node-card {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 0.85rem 0.75rem;
+      text-align: center;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+    }
+    .node-card.active {
+      border-color: var(--accent-cyan);
+      box-shadow: 0 0 20px rgba(6, 182, 212, 0.3);
+      background: rgba(6, 182, 212, 0.08);
+      transform: translateY(-2px);
+    }
+    .node-card.interrupted {
+      border-color: var(--accent-rose);
+      box-shadow: 0 0 25px rgba(244, 63, 94, 0.4);
+      background: rgba(244, 63, 94, 0.1);
+      animation: alertPulse 1.5s infinite;
+    }
+    @keyframes alertPulse {
+      0%, 100% { box-shadow: 0 0 15px rgba(244, 63, 94, 0.3); }
+      50% { box-shadow: 0 0 30px rgba(244, 63, 94, 0.6); }
+    }
+    .node-icon {
+      font-size: 1.25rem;
+      margin-bottom: 0.3rem;
+    }
+    .node-name {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+    .node-status {
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      margin-top: 0.25rem;
+      font-family: var(--font-mono);
+    }
+
+    /* Live Event Terminal */
+    .terminal-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      border-top: 1px solid var(--border-subtle);
+      min-height: 380px;
+    }
+    .terminal-body {
+      flex: 1;
+      background: #050810;
+      padding: 1rem;
+      overflow-y: auto;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .event-row {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      padding: 0.5rem 0.65rem;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.02);
+      border-left: 3px solid var(--border-subtle);
+      animation: fadeIn 0.2s ease;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .event-row.ev-supervisor { border-left-color: var(--accent-indigo); }
+    .event-row.ev-policy { border-left-color: var(--accent-cyan); }
+    .event-row.ev-hitl { border-left-color: var(--accent-rose); background: rgba(244, 63, 94, 0.06); }
+    .event-row.ev-tool { border-left-color: var(--accent-amber); }
+    .event-row.ev-message { border-left-color: var(--accent-emerald); }
+
+    .ev-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.72rem;
+    }
+    .ev-badge {
+      font-weight: 700;
+      padding: 0.1rem 0.4rem;
+      border-radius: 4px;
+      font-size: 0.65rem;
+    }
+    .ev-content {
+      color: #cbd5e1;
+      white-space: pre-wrap;
+      word-break: break-word;
+      line-height: 1.4;
+    }
+
+    /* Modal for HITL */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(5, 8, 16, 0.8);
+      backdrop-filter: blur(8px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      animation: fadeIn 0.2s ease;
+    }
+    .modal-overlay.open {
+      display: flex;
+    }
+    .modal-card {
+      background: #0d1424;
+      border: 1px solid rgba(244, 63, 94, 0.5);
+      box-shadow: 0 0 50px rgba(244, 63, 94, 0.25);
+      border-radius: 16px;
+      width: 90%;
+      max-width: 580px;
+      overflow: hidden;
+      animation: scaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes scaleIn {
+      from { transform: scale(0.95); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+    .modal-header {
+      background: linear-gradient(135deg, rgba(244, 63, 94, 0.2), rgba(244, 63, 94, 0.05));
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid rgba(244, 63, 94, 0.2);
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .modal-icon {
+      font-size: 1.75rem;
+    }
+    .modal-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #fff;
+    }
+    .modal-body {
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .detail-box {
+      background: #060913;
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 0.85rem;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: #93c5fd;
+    }
+    .modal-actions {
+      padding: 1rem 1.5rem;
+      background: rgba(255, 255, 255, 0.02);
+      border-top: 1px solid var(--border-subtle);
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.75rem;
+    }
+    .btn-approve {
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: white;
+    }
+    .btn-approve:hover {
+      box-shadow: 0 0 20px rgba(16, 185, 129, 0.5);
+    }
+    .btn-reject {
+      background: rgba(244, 63, 94, 0.15);
+      border: 1px solid rgba(244, 63, 94, 0.3);
+      color: #fb7185;
+    }
+    .btn-reject:hover {
+      background: rgba(244, 63, 94, 0.25);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header>
+    <div class="brand">
+      <div class="brand-icon">🛡️</div>
+      <div>
+        <div class="brand-title">SentinelGraph</div>
+        <div class="brand-subtitle">High-Assurance Agent Runtime</div>
+      </div>
+    </div>
+    <div class="header-badges">
+      <div class="badge badge-sandbox">
+        <span>⚠️</span> SIMULATED SANDBOX (DEMO ONLY)
+      </div>
+      <div class="badge">
+        <span>💾</span> SQLite Checkpointer
+      </div>
+      <div class="badge">
+        <div class="pulse-dot"></div>
+        <span id="conn-status">System Ready</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Work Area -->
+  <main>
+    <!-- Left Column: Interactive Command & Demo Center -->
+    <section class="panel">
+      <div class="panel-header">
+        <div class="panel-title">
+          <span>⚡</span> Operator Command Console
+        </div>
+        <div style="font-size: 0.75rem; color: var(--text-muted);">
+          Thread: <code id="thread-id-display" style="color: var(--accent-cyan);">demo-session-01</code>
+        </div>
+      </div>
+
+      <div class="console-content">
+        <div>
+          <div class="section-label">Interactive Demo Presets</div>
+          <div class="presets-grid">
+            <div class="preset-card" onclick="loadPreset(1)">
+              <div class="preset-header">
+                <span class="preset-name">Cluster Telemetry</span>
+                <span class="preset-tag tag-safe">SAFE</span>
+              </div>
+              <p class="preset-desc">Read-only diagnostic query. Auto-cleared by Policy Guard.</p>
+            </div>
+
+            <div class="preset-card" onclick="loadPreset(2)">
+              <div class="preset-header">
+                <span class="preset-name">Scale Microservice</span>
+                <span class="preset-tag tag-guarded">GUARDED</span>
+              </div>
+              <p class="preset-desc">Rebalances container replicas within permissible bounds.</p>
+            </div>
+
+            <div class="preset-card" onclick="loadPreset(3)">
+              <div class="preset-header">
+                <span class="preset-name">Port Vell Emergency</span>
+                <span class="preset-tag tag-critical">CRITICAL (HITL)</span>
+              </div>
+              <p class="preset-desc">Simulated €50,000 disbursement. Triggers Human Approval.</p>
+            </div>
+
+            <div class="preset-card" onclick="loadPreset(4)">
+              <div class="preset-header">
+                <span class="preset-name">Policy Breach Attempt</span>
+                <span class="preset-tag tag-critical">AUTO-BLOCKED</span>
+              </div>
+              <p class="preset-desc">Exceeds €500,000 sandbox policy cap. Circuit-breaker halt.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="input-wrapper">
+          <div class="section-label">Agent Prompt</div>
+          <div class="input-bar">
+            <textarea id="prompt-input" placeholder="Enter instructions or choose a preset above..."></textarea>
+            <button id="send-btn" class="btn" onclick="submitQuery()">
+              <span>Execute</span>
+              <span>➔</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Right Column: Graph Pipeline & Execution Stream -->
+    <section class="panel">
+      <div class="panel-header">
+        <div class="panel-title">
+          <span>🧠</span> Live Graph Pipeline &amp; Audit Stream
+        </div>
+        <button class="badge" onclick="clearTerminal()" style="cursor: pointer; background: transparent;">
+          Clear Logs
+        </button>
+      </div>
+
+      <div class="pipeline-container">
+        <div class="nodes-flow">
+          <div class="node-card" id="node-supervisor">
+            <div class="node-icon">🧭</div>
+            <div class="node-name">Supervisor</div>
+            <div class="node-status" id="status-supervisor">Idle</div>
+          </div>
+
+          <div class="node-card" id="node-worker">
+            <div class="node-icon">🤖</div>
+            <div class="node-name">Worker LLM</div>
+            <div class="node-status" id="status-worker">Idle</div>
+          </div>
+
+          <div class="node-card" id="node-policy">
+            <div class="node-icon">🛡️</div>
+            <div class="node-name">Policy Guard</div>
+            <div class="node-status" id="status-policy">Idle</div>
+          </div>
+
+          <div class="node-card" id="node-executor">
+            <div class="node-icon">⚙️</div>
+            <div class="node-name">Sandbox Exec</div>
+            <div class="node-status" id="status-executor">Idle</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="terminal-container">
+        <div class="terminal-body" id="event-log">
+          <div class="event-row">
+            <div class="ev-header">
+              <span class="ev-badge" style="background: rgba(255,255,255,0.08); color: #94a3b8;">SYSTEM</span>
+              <span style="color: #64748b;">Ready</span>
+            </div>
+            <div class="ev-content">SentinelGraph ready. Select a preset or type a command to trigger deterministic graph execution.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Human-in-the-Loop Approval Modal -->
+  <div class="modal-overlay" id="hitl-modal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-icon">⚠️</div>
+        <div>
+          <div class="modal-title">Human-in-the-Loop Approval Required</div>
+          <div style="font-size: 0.75rem; color: #fb7185;">Policy Alert: High-Risk Simulated Action Paused at Checkpoint</div>
+        </div>
+      </div>
+
+      <div class="modal-body">
+        <p style="font-size: 0.85rem; color: #e2e8f0; line-height: 1.4;" id="hitl-reason">
+          The agent has planned a critical action requiring deterministic operator authorization.
+        </p>
+
+        <div class="detail-box" id="hitl-details">
+          <!-- Populated dynamically -->
+        </div>
+
+        <div style="font-size: 0.72rem; color: #f59e0b; background: rgba(245, 158, 11, 0.08); padding: 0.5rem; border-radius: 6px;">
+          🛡️ <strong>Safety Guarantee:</strong> Approving executes strictly within the local mock sandbox. No real bank accounts or infrastructure APIs are connected.
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-reject" onclick="respondHITL(false)">✕ Reject Action</button>
+        <button class="btn btn-approve" onclick="respondHITL(true)">✓ Authorize (Simulated)</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const currentThreadId = "demo-" + Math.random().toString(36).substring(2, 9);
+    document.getElementById("thread-id-display").innerText = currentThreadId;
+
+    let activeInterrupt = null;
+
+    const presets = {
+      1: "Query cluster telemetry for memory, CPU utilization, and active microservices.",
+      2: "Scale service 'dock-automation-worker' to 4 replicas for upcoming container handling.",
+      3: "Authorize emergency transfer of 50,000 EUR to Port Vell maintenance contractor for dock repairs.",
+      4: "Simulate emergency transfer of 850,000 EUR to offshore recovery account."
+    };
+
+    function loadPreset(id) {
+      document.getElementById("prompt-input").value = presets[id];
+    }
+
+    function setNodeState(nodeId, state, statusText) {
+      const el = document.getElementById("node-" + nodeId);
+      const statusEl = document.getElementById("status-" + nodeId);
+      el.classList.remove("active", "interrupted");
+      if (state === "active") el.classList.add("active");
+      if (state === "interrupted") el.classList.add("interrupted");
+      if (statusText && statusEl) statusEl.innerText = statusText;
+    }
+
+    function resetNodes() {
+      ["supervisor", "worker", "policy", "executor"].forEach(id => {
+        setNodeState(id, "idle", "Idle");
+      });
+    }
+
+    function addEventRow(type, title, content, badgeClass, badgeStyle) {
+      const log = document.getElementById("event-log");
+      const row = document.createElement("div");
+      row.className = `event-row ev-${type}`;
+
+      const time = new Date().toLocaleTimeString();
+      row.innerHTML = `
+        <div class="ev-header">
+          <span class="ev-badge ${badgeClass || ''}" style="${badgeStyle || ''}">${title}</span>
+          <span style="color: #64748b;">${time}</span>
+        </div>
+        <div class="ev-content">${escapeHtml(content)}</div>
+      `;
+      log.appendChild(row);
+      log.scrollTop = log.scrollHeight;
+    }
+
+    function escapeHtml(str) {
+      if (!str) return "";
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    }
+
+    function clearTerminal() {
+      document.getElementById("event-log").innerHTML = "";
+    }
+
+    async function submitQuery() {
+      const input = document.getElementById("prompt-input");
+      const query = input.value.trim();
+      if (!query) return;
+
+      input.disabled = true;
+      document.getElementById("send-btn").disabled = true;
+      document.getElementById("conn-status").innerText = "Executing Graph...";
+      resetNodes();
+
+      addEventRow("user", "USER INPUT", query, "tag-safe");
+
+      try {
+        const response = await fetch("/stream", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: query, thread_id: currentThreadId })
+        });
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+
+          const lines = buffer.split("\n\n");
+          buffer = lines.pop(); // Keep last partial
+
+          for (const block of lines) {
+            const trimmed = block.trim();
+            if (!trimmed.startsWith("data:")) continue;
+            const dataStr = trimmed.replace(/^data:\s*/, "");
+            if (dataStr === "[DONE]") {
+              document.getElementById("conn-status").innerText = "Finished";
+              break;
+            }
+            try {
+              const ev = JSON.parse(dataStr);
+              handleAgentEvent(ev);
+            } catch (err) {
+              console.error("JSON parse error", dataStr);
+            }
+          }
+        }
+      } catch (err) {
+        addEventRow("error", "STREAM ERROR", String(err), "tag-critical");
+      } finally {
+        input.disabled = false;
+        document.getElementById("send-btn").disabled = false;
+      }
+    }
+
+    function handleAgentEvent(ev) {
+      if (ev.type === "supervisor") {
+        setNodeState("supervisor", "active", ev.risk_level);
+        addEventRow("supervisor", "SUPERVISOR", 
+          `Intent: ${ev.intent} | Risk: ${ev.risk_level}\nSummary: ${ev.summary}`, 
+          ev.risk_level === "CRITICAL" ? "tag-critical" : "tag-safe"
+        );
+      } else if (ev.type === "policy_check") {
+        setNodeState("policy", "active", ev.status);
+        const style = ev.status === "PASSED" ? "background: #10b981; color: #fff;" : 
+                      ev.status === "FLAGGED" ? "background: #f59e0b; color: #000;" : "background: #f43f5e; color: #fff;";
+        addEventRow("policy", `POLICY: ${ev.status}`, 
+          `Tool: ${ev.tool}\nReason: ${ev.reason}\nRisk: ${ev.risk_level}`, 
+          "", style
+        );
+      } else if (ev.type === "hitl_required") {
+        setNodeState("policy", "interrupted", "INTERRUPTED");
+        activeInterrupt = ev;
+        showHITLModal(ev);
+      } else if (ev.type === "tool_call") {
+        setNodeState("worker", "active", "Tool Call");
+        addEventRow("tool", "TOOL CALL", 
+          `Tool: ${ev.tool}\nArgs: ${JSON.stringify(ev.args, null, 2)}`, 
+          "tag-guarded"
+        );
+      } else if (ev.type === "tool_result") {
+        setNodeState("executor", "active", "Executed");
+        addEventRow("tool", "TOOL RESULT", ev.output, "tag-safe");
+      } else if (ev.type === "message") {
+        setNodeState("worker", "active", "Complete");
+        addEventRow("message", "SYNTHESIZED ANSWER", ev.content, "tag-safe");
+      }
+    }
+
+    function showHITLModal(data) {
+      const modal = document.getElementById("hitl-modal");
+      document.getElementById("hitl-reason").innerText = data.reason || "High-risk action requires human authorization.";
+      document.getElementById("hitl-details").innerText = 
+        `Action: ${data.tool}\nArguments:\n${JSON.stringify(data.args, null, 2)}`;
+      modal.classList.add("open");
+    }
+
+    async function respondHITL(approved) {
+      document.getElementById("hitl-modal").classList.remove("open");
+      addEventRow("hitl", approved ? "OPERATOR: APPROVED" : "OPERATOR: DENIED", 
+        approved ? "Authorization granted. Proceeding with simulated execution." : "Action denied by human operator.", 
+        approved ? "tag-safe" : "tag-critical"
+      );
+
+      setNodeState("policy", "active", approved ? "Resumed" : "Rejected");
+      document.getElementById("conn-status").innerText = "Resuming Graph...";
+
+      try {
+        const response = await fetch("/resume", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            thread_id: currentThreadId,
+            approved: approved,
+            feedback: approved ? "Approved by supervisor" : "Rejected by operator policy oversight"
+          })
+        });
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+
+          const lines = buffer.split("\n\n");
+          buffer = lines.pop();
+
+          for (const block of lines) {
+            const trimmed = block.trim();
+            if (!trimmed.startsWith("data:")) continue;
+            const dataStr = trimmed.replace(/^data:\s*/, "");
+            if (dataStr === "[DONE]") {
+              document.getElementById("conn-status").innerText = "Finished";
+              break;
+            }
+            try {
+              const ev = JSON.parse(dataStr);
+              handleAgentEvent(ev);
+            } catch (err) {}
+          }
+        }
+      } catch (err) {
+        addEventRow("error", "RESUME ERROR", String(err), "tag-critical");
+      }
+    }
+  </script>
+</body>
+</html>
