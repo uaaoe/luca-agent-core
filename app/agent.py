@@ -15,11 +15,21 @@ from app.config import settings
 @tool
 def get_weather_forecast(city: str) -> str:
     """Get the current weather forecast for a given city."""
-    return f"The weather in {city} is 26°C, mostly sunny with low humidity."
+    # Tool assertion: validate input before network calls
+    assert city and isinstance(city, str), "Sanity Check: City must be a non-empty string"
+    
+    result = f"The weather in {city} is 26°C, mostly sunny."
+    
+    # Sanity Check: Ensure output contract is satisfied
+    assert len(result) > 0, "Tool produced empty output"
+    return result
 
 @tool
 def calculate_metric(expression: str) -> str:
     """Safely calculate basic mathematical expressions."""
+    # Tool assertion: validate input before evaluation
+    assert expression and isinstance(expression, str), "Sanity Check: Expression must be a non-empty string"
+
     try:
         allowed = {"__builtins__": {}}
         result = eval(expression, allowed, {})
@@ -105,6 +115,11 @@ workflow.add_edge("tools", "agent")
 
 checkpointer = MemorySaver()
 agent_app = workflow.compile(checkpointer=checkpointer)
+
+# --- Sanity Assertions on Compiled Graph ---
+expected_nodes = {"agent", "tools"}
+actual_nodes = set(agent_app.nodes.keys())
+assert expected_nodes.issubset(actual_nodes), f"Graph missing required nodes! Found: {actual_nodes}"
 
 # ---------------------------------------------------------------------------
 # 5. SSE Streaming Runner
