@@ -1,12 +1,14 @@
 import asyncio
 import json
-from typing import Annotated, Any, Literal, Sequence, TypedDict
-from langchain_core.messages import BaseMessage, HumanMessage, ToolMessage, AIMessage
+from collections.abc import Sequence
+from typing import Annotated, Any, Literal, TypedDict
+
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langgraph.graph import StateGraph, END, START
-from langgraph.graph.message import add_messages
 from langgraph.checkpoint.memory import MemorySaver
+from langgraph.graph import END, START, StateGraph
+from langgraph.graph.message import add_messages
 
 from app.config import settings
 from app.tools.registry import registry
@@ -83,7 +85,7 @@ async def execute_tools(state: AgentState):
                 )
             except Exception as exc:
                 return ToolMessage(
-                    content=f"Tool execution error: {str(exc)}",
+                    content=f"Tool execution error: {exc!s}",
                     name=tool_name,
                     tool_call_id=tool_id,
                 )
@@ -96,7 +98,7 @@ async def execute_tools(state: AgentState):
                 call = last_message.tool_calls[idx]
                 tool_messages.append(
                     ToolMessage(
-                        content=f"Tool execution error: {str(res)}",
+                        content=f"Tool execution error: {res!s}",
                         name=call["name"],
                         tool_call_id=call.get("id"),
                     )
