@@ -8,8 +8,8 @@ A FastAPI backend that runs a LangGraph agent on Gemini and streams its output o
 
 | Area | Issue | Status |
 |------|-------|--------|
-| Safe expression evaluation in `calculate_metric` | [#4](../../issues/4) | In progress |
-| Per-session isolation (no shared default `thread_id`) | [#5](../../issues/5) | In progress |
+| Safe expression evaluation in `calculate_metric` | [#4](../../issues/4) | Planned |
+| Per-session isolation (no shared default `thread_id`) | [#5](../../issues/5) | Planned |
 | Configurable CORS origins | [#6](../../issues/6) | Planned |
 | Config validation, `.env.example`, cleanup | [#7](../../issues/7) | Planned |
 
