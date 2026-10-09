@@ -14,6 +14,34 @@ A high-velocity, deterministic AI agent backend built for rapid prototyping and 
 
 ---
 
+## 🚧 Status
+
+**Active prototype.** The core loop works end to end: dynamic tool discovery, per-request tool opt-in, concurrent tool execution and SSE streaming. It is not yet production-hardened. Known gaps and planned work are tracked in the open issues:
+
+| Area | Issue | Status |
+|------|-------|--------|
+| Safe expression evaluation in `calculate_metric` | [#4](../../issues/4) | 🔧 In progress |
+| Per-session isolation (no shared default `thread_id`) | [#5](../../issues/5) | 🔧 In progress |
+| Configurable CORS origins | [#6](../../issues/6) | 📋 Planned |
+| Config validation, `.env.example` and project cleanup | [#7](../../issues/7) | 📋 Planned |
+
+### Current limitations
+- Conversation history is held in memory (`MemorySaver`), so it is lost on restart.
+- The bundled `get_weather_forecast` tool is a stub that returns a fixed value. It exists to demonstrate the tool contract, not to provide real data.
+- Only Gemini is wired up as an LLM provider.
+
+### Roadmap
+- Persistent checkpointing (for example SQLite or Postgres)
+- Provider switching via configuration
+- Unit and integration tests alongside the live smoke test
+- Authentication for the `/stream` endpoint
+
+Changes are developed spec-first with [OpenSpec](https://github.com/Fission-AI/OpenSpec); completed changes are archived under `openspec/changes/archive/`.
+
+Contributions and feedback are welcome. See the open issues, including those labelled `good first issue`.
+
+---
+
 ## 📁 Repository Structure
 
 ```text
