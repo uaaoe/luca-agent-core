@@ -187,7 +187,7 @@ async def stream_agent_execution(
         config=config,
         stream_mode="updates"
     ):
-        for node_name, state_update in event.items():
+        for state_update in event.values():
             messages = state_update.get("messages", [])
 
             for msg in messages:
