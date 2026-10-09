@@ -83,7 +83,8 @@ async def execute_tools(state: AgentState):
                     name=tool_name,
                     tool_call_id=tool_id,
                 )
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
+                # Dynamically registered tools can raise arbitrary runtime errors.
                 return ToolMessage(
                     content=f"Tool execution error: {exc!s}",
                     name=tool_name,

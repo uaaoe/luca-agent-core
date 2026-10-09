@@ -65,7 +65,8 @@ async def run_pipeline(payload: StreamRequest):
             ):
                 yield f"data: {chunk}\n\n"
             yield "data: [DONE]\n\n"
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
+            # Keep failures from the streaming boundary in the SSE response.
             import traceback
             traceback.print_exc()
             yield f"data: {json.dumps({'error': str(exc)})}\n\n"
