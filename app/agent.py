@@ -1,47 +1,21 @@
+import asyncio
 import json
-from typing import Annotated, Literal, Sequence, TypedDict
+from typing import Annotated, Any, Literal, Sequence, TypedDict
 from langchain_core.messages import BaseMessage, HumanMessage, ToolMessage, AIMessage
-from langchain_core.tools import tool
+from langchain_core.runnables import RunnableConfig
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.graph import StateGraph, END, START
 from langgraph.graph.message import add_messages
 from langgraph.checkpoint.memory import MemorySaver
 
 from app.config import settings
+from app.tools.registry import registry
+
+# Discover all tools dynamically on startup
+registry.auto_discover()
 
 # ---------------------------------------------------------------------------
-# 1. Reusable Tools
-# ---------------------------------------------------------------------------
-@tool
-def get_weather_forecast(city: str) -> str:
-    """Get the current weather forecast for a given city."""
-    # Tool assertion: validate input before network calls
-    assert city and isinstance(city, str), "Sanity Check: City must be a non-empty string"
-    
-    result = f"The weather in {city} is 26°C, mostly sunny."
-    
-    # Sanity Check: Ensure output contract is satisfied
-    assert len(result) > 0, "Tool produced empty output"
-    return result
-
-@tool
-def calculate_metric(expression: str) -> str:
-    """Safely calculate basic mathematical expressions."""
-    # Tool assertion: validate input before evaluation
-    assert expression and isinstance(expression, str), "Sanity Check: Expression must be a non-empty string"
-
-    try:
-        allowed = {"__builtins__": {}}
-        result = eval(expression, allowed, {})
-        return f"Calculation result: {result}"
-    except Exception as exc:
-        return f"Calculation error: {str(exc)}"
-
-tools = [get_weather_forecast, calculate_metric]
-tools_by_name = {t.name: t for t in tools}
-
-# ---------------------------------------------------------------------------
-# 2. Gemini LLM Initialization & Tool Binding
+# 1. Gemini LLM Initialization
 # ---------------------------------------------------------------------------
 llm = ChatGoogleGenerativeAI(
     model="gemini-3.5-flash-lite",
@@ -50,59 +24,102 @@ llm = ChatGoogleGenerativeAI(
     request_timeout=15.0,
 )
 
-llm_with_tools = llm.bind_tools(tools)
+
+def resolve_model(active_tools: Sequence[str] | None = None):
+    """
+    Bind tools to LLM if requested, otherwise return the raw LLM.
+    Ensures zero tools are bound by default (strict opt-in).
+    """
+    if active_tools:
+        selected_tools = registry.get_tools(active_tools)
+        if selected_tools:
+            return llm.bind_tools(selected_tools)
+    return llm
+
 
 # ---------------------------------------------------------------------------
-# 3. Agent State & Nodes
+# 2. Agent State & Nodes
 # ---------------------------------------------------------------------------
 class AgentState(TypedDict):
     messages: Annotated[Sequence[BaseMessage], add_messages]
 
-async def call_model(state: AgentState):
-    """Invoke Gemini with full message history."""
-    response = await llm_with_tools.ainvoke(state["messages"])
+
+async def call_model(state: AgentState, config: RunnableConfig | None = None):
+    """Invoke Gemini with dynamic tool binding from RunnableConfig."""
+    active_tools: list[str] = []
+    if config and "configurable" in config:
+        active_tools = config["configurable"].get("active_tools") or []
+
+    model = resolve_model(active_tools)
+    response = await model.ainvoke(state["messages"])
     return {"messages": [response]}
 
+
 async def execute_tools(state: AgentState):
-    """Execute tools requested by Gemini."""
+    """Execute tools requested by Gemini concurrently with resilient error handling."""
     last_message = state["messages"][-1]
-    tool_messages = []
+    tool_messages: list[ToolMessage] = []
 
     if isinstance(last_message, AIMessage) and last_message.tool_calls:
-        for tool_call in last_message.tool_calls:
-            tool_name = tool_call["name"]
-            tool_args = tool_call["args"]
-            tool_id = tool_call["id"]
+        async def run_single_tool(call: dict[str, Any]) -> ToolMessage:
+            tool_name = call["name"]
+            tool_args = call.get("args", {})
+            tool_id = call.get("id")
 
-            if tool_name in tools_by_name:
-                selected_tool = tools_by_name[tool_name]
+            selected_tool = registry.get_tool(tool_name)
+            if not selected_tool:
+                return ToolMessage(
+                    content=f"Error: Tool '{tool_name}' not found.",
+                    name=tool_name,
+                    tool_call_id=tool_id,
+                )
+
+            try:
                 tool_output = await selected_tool.ainvoke(tool_args)
-            else:
-                tool_output = f"Error: Tool '{tool_name}' not found."
-
-            tool_messages.append(
-                ToolMessage(
+                return ToolMessage(
                     content=str(tool_output),
                     name=tool_name,
                     tool_call_id=tool_id,
                 )
-            )
+            except Exception as exc:
+                return ToolMessage(
+                    content=f"Tool execution error: {str(exc)}",
+                    name=tool_name,
+                    tool_call_id=tool_id,
+                )
+
+        tasks = [run_single_tool(call) for call in last_message.tool_calls]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        for idx, res in enumerate(results):
+            if isinstance(res, Exception):
+                call = last_message.tool_calls[idx]
+                tool_messages.append(
+                    ToolMessage(
+                        content=f"Tool execution error: {str(res)}",
+                        name=call["name"],
+                        tool_call_id=call.get("id"),
+                    )
+                )
+            else:
+                tool_messages.append(res)
 
     return {"messages": tool_messages}
+
 
 def should_continue(state: AgentState) -> Literal["tools", "__end__"]:
     """Terminate the loop when no tool calls are pending."""
     last_message = state["messages"][-1]
-    
+
     # Check if there are explicit tool calls requested
     if isinstance(last_message, AIMessage) and bool(getattr(last_message, "tool_calls", None)):
         return "tools"
-    
+
     return "__end__"
 
 
 # ---------------------------------------------------------------------------
-# 4. Assemble Graph with In-Memory Checkpointer
+# 3. Assemble Graph with In-Memory Checkpointer
 # ---------------------------------------------------------------------------
 workflow = StateGraph(AgentState)  # type: ignore[bad-specialization]
 
@@ -121,8 +138,9 @@ expected_nodes = {"agent", "tools"}
 actual_nodes = set(agent_app.nodes.keys())
 assert expected_nodes.issubset(actual_nodes), f"Graph missing required nodes! Found: {actual_nodes}"
 
+
 # ---------------------------------------------------------------------------
-# 5. SSE Streaming Runner
+# 4. SSE Streaming Runner
 # ---------------------------------------------------------------------------
 def extract_clean_text(content) -> str:
     """Extract clean string text without Google signature/extras metadata."""
@@ -143,14 +161,22 @@ def extract_clean_text(content) -> str:
     return str(content).strip()
 
 
-async def stream_agent_execution(user_query: str, thread_id: str = "default-session"):
+async def stream_agent_execution(
+    user_query: str,
+    thread_id: str = "default-session",
+    tools: list[str] | None = None,
+):
     """
     Streams clean, minimal events for the frontend:
     - tool_call: When the agent decides to invoke an external tool
     - tool_result: The output from the executed tool
     - message: The final synthesized AI answer
     """
-    config = {"configurable": {"thread_id": thread_id}}
+    configurable: dict[str, Any] = {"thread_id": thread_id}
+    if tools is not None:
+        configurable["active_tools"] = tools
+
+    config = {"configurable": configurable}
     input_message = HumanMessage(content=user_query)
 
     async for event in agent_app.astream(
