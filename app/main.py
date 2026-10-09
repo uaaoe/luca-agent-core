@@ -1,4 +1,5 @@
 import json
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,14 +10,23 @@ from app.agent import stream_agent_execution
 from app.config import settings
 from app.tools.registry import registry
 
-# Ensure tools are auto-discovered
-registry.auto_discover()
 
-app = FastAPI(title="Luca Agent Core", version="0.2.0")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Ensure tools are auto-discovered on startup
+    registry.auto_discover()
+    yield
+
+
+app = FastAPI(
+    title="Luca Agent Core",
+    version="0.2.0",
+    lifespan=lifespan,
+)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -32,7 +42,12 @@ class StreamRequest(BaseModel):
 
 @app.get("/health")
 def health_check():
-    return {"status": "ok", "app": "luca-agent-core", "provider": settings.llm_provider}
+    return {
+        "status": "ok",
+        "app": "luca-agent-core",
+        "provider": settings.llm_provider,
+        "model": settings.model_name,
+    }
 
 
 @app.get("/tools")
@@ -67,6 +82,7 @@ async def run_pipeline(payload: StreamRequest):
             yield "data: [DONE]\n\n"
         except Exception as exc:
             import traceback
+
             traceback.print_exc()
             yield f"data: {json.dumps({'error': str(exc)})}\n\n"
 
