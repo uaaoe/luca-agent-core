@@ -1,4 +1,5 @@
 from langchain_core.tools import tool
+
 from app.tools.registry import registry
 
 
@@ -13,5 +14,15 @@ def calculate_metric(expression: str) -> str:
         allowed = {"__builtins__": {}}
         result = eval(expression, allowed, {})
         return f"Calculation result: {result}"
-    except Exception as exc:
-        return f"Calculation error: {str(exc)}"
+    except (
+        ArithmeticError,
+        AttributeError,
+        IndexError,
+        KeyError,
+        NameError,
+        RecursionError,
+        SyntaxError,
+        TypeError,
+        ValueError,
+    ) as exc:
+        return f"Calculation error: {exc!s}"

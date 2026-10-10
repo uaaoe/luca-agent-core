@@ -1,5 +1,7 @@
 import asyncio
-from typing import Annotated, Any, Literal, Sequence, TypedDict
+import json
+from collections.abc import Sequence
+from typing import Annotated, Any, Literal, TypedDict
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
@@ -79,9 +81,10 @@ async def execute_tools(state: AgentState):
                     name=tool_name,
                     tool_call_id=tool_id,
                 )
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
+                # Dynamically registered tools can raise arbitrary runtime errors.
                 return ToolMessage(
-                    content=f"Tool execution error: {str(exc)}",
+                    content=f"Tool execution error: {exc!s}",
                     name=tool_name,
                     tool_call_id=tool_id,
                 )
@@ -94,7 +97,7 @@ async def execute_tools(state: AgentState):
                 call = last_message.tool_calls[idx]
                 tool_messages.append(
                     ToolMessage(
-                        content=f"Tool execution error: {str(res)}",
+                        content=f"Tool execution error: {res!s}",
                         name=call["name"],
                         tool_call_id=call.get("id"),
                     )
@@ -153,8 +156,32 @@ async def stream_agent_execution(
         config=config,
         stream_mode="values",
     ):
-        messages = event.get("messages", [])
-        if messages:
-            last_msg = messages[-1]
-            if isinstance(last_msg, AIMessage) and not last_msg.tool_calls:
-                yield str(last_msg.content)
+        for state_update in event.values():
+            messages = state_update.get("messages", [])
+
+            for msg in messages:
+                # 1. Agent initiated tool call(s)
+                if isinstance(msg, AIMessage) and msg.tool_calls:
+                    for call in msg.tool_calls:
+                        yield json.dumps({
+                            "type": "tool_call",
+                            "tool": call["name"],
+                            "args": call["args"]
+                        })
+
+                # 2. Tool executed and returned output
+                elif isinstance(msg, ToolMessage):
+                    yield json.dumps({
+                        "type": "tool_result",
+                        "tool": msg.name,
+                        "output": msg.content
+                    })
+
+                # 3. Agent generated final conversational answer
+                elif isinstance(msg, AIMessage):
+                    clean_text = extract_clean_text(msg.content)
+                    if clean_text:
+                        yield json.dumps({
+                            "type": "message",
+                            "content": clean_text
+                        })
