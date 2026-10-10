@@ -13,18 +13,15 @@ from langgraph.graph.message import add_messages
 from app.config import settings
 from app.tools.registry import registry
 
-# Discover all tools dynamically on startup
-registry.auto_discover()
 
-# ---------------------------------------------------------------------------
-# 1. Gemini LLM Initialization
-# ---------------------------------------------------------------------------
-llm = ChatGoogleGenerativeAI(
-    model="gemini-3.5-flash-lite",
-    google_api_key=settings.google_api_key,
-    max_retries=2,
-    request_timeout=15.0,
-)
+def get_llm():
+    """Lazy initialize the Gemini LLM instance."""
+    return ChatGoogleGenerativeAI(
+        model=settings.model_name,
+        google_api_key=settings.google_api_key or "placeholder_key",
+        max_retries=2,
+        request_timeout=15.0,
+    )
 
 
 def resolve_model(active_tools: Sequence[str] | None = None):
@@ -32,11 +29,12 @@ def resolve_model(active_tools: Sequence[str] | None = None):
     Bind tools to LLM if requested, otherwise return the raw LLM.
     Ensures zero tools are bound by default (strict opt-in).
     """
+    model = get_llm()
     if active_tools:
         selected_tools = registry.get_tools(active_tools)
         if selected_tools:
-            return llm.bind_tools(selected_tools)
-    return llm
+            return model.bind_tools(selected_tools)
+    return model
 
 
 # ---------------------------------------------------------------------------
@@ -114,7 +112,6 @@ def should_continue(state: AgentState) -> Literal["tools", "__end__"]:
     """Terminate the loop when no tool calls are pending."""
     last_message = state["messages"][-1]
 
-    # Check if there are explicit tool calls requested
     if isinstance(last_message, AIMessage) and bool(getattr(last_message, "tool_calls", None)):
         return "tools"
 
@@ -124,7 +121,7 @@ def should_continue(state: AgentState) -> Literal["tools", "__end__"]:
 # ---------------------------------------------------------------------------
 # 3. Assemble Graph with In-Memory Checkpointer
 # ---------------------------------------------------------------------------
-workflow = StateGraph(AgentState)  # type: ignore[bad-specialization]
+workflow = StateGraph(AgentState)
 
 workflow.add_node("agent", call_model)
 workflow.add_node("tools", execute_tools)
@@ -136,45 +133,17 @@ workflow.add_edge("tools", "agent")
 checkpointer = MemorySaver()
 agent_app = workflow.compile(checkpointer=checkpointer)
 
-# --- Sanity Assertions on Compiled Graph ---
-expected_nodes = {"agent", "tools"}
-actual_nodes = set(agent_app.nodes.keys())
-assert expected_nodes.issubset(actual_nodes), f"Graph missing required nodes! Found: {actual_nodes}"
-
 
 # ---------------------------------------------------------------------------
 # 4. SSE Streaming Runner
 # ---------------------------------------------------------------------------
-def extract_clean_text(content) -> str:
-    """Extract clean string text without Google signature/extras metadata."""
-    if isinstance(content, str):
-        return content
-    if isinstance(content, list):
-        parts = []
-        for part in content:
-            if isinstance(part, dict):
-                # Only keep user-facing text, ignore 'extras', 'signature', etc.
-                if part.get("type") == "text" or "text" in part:
-                    parts.append(part.get("text", ""))
-            elif hasattr(part, "text"):
-                parts.append(part.text)
-            else:
-                parts.append(str(part))
-        return "".join(parts).strip()
-    return str(content).strip()
-
-
 async def stream_agent_execution(
     user_query: str,
     thread_id: str = "default-session",
     tools: list[str] | None = None,
 ):
-    """
-    Streams clean, minimal events for the frontend:
-    - tool_call: When the agent decides to invoke an external tool
-    - tool_result: The output from the executed tool
-    - message: The final synthesized AI answer
-    """
+    """Streams clean events for the frontend."""
+    settings.validate_api_keys()
     configurable: dict[str, Any] = {"thread_id": thread_id}
     if tools is not None:
         configurable["active_tools"] = tools
@@ -185,7 +154,7 @@ async def stream_agent_execution(
     async for event in agent_app.astream(
         {"messages": [input_message]},
         config=config,
-        stream_mode="updates"
+        stream_mode="values",
     ):
         for state_update in event.values():
             messages = state_update.get("messages", [])
