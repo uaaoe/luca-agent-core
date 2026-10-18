@@ -1,4 +1,7 @@
+import json
+from contextlib import suppress
 from typing import Any
+
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -22,11 +25,10 @@ class Settings(BaseSettings):
         if isinstance(v, str):
             v = v.strip()
             if v.startswith("[") and v.endswith("]"):
-                import json
-                try:
-                    return json.loads(v)
-                except Exception:
-                    pass
+                with suppress(json.JSONDecodeError, TypeError):
+                    parsed = json.loads(v)
+                    if isinstance(parsed, list):
+                        return [str(item).strip() for item in parsed]
             return [origin.strip() for origin in v.split(",") if origin.strip()]
         return v
 
