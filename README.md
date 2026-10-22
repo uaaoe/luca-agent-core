@@ -41,7 +41,7 @@ uv sync
 uv run uvicorn app.main:app --reload --port 8000
 ```
 
-Interactive docs: `http://localhost:8000/docs`. Python 3.11+ (3.12 pinned in `.python-version`).
+Interactive docs: `http://localhost:8000/docs`. Requires Python >= 3.11 (3.12 pinned in `.python-version`).
 
 ## API
 

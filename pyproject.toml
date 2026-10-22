@@ -1,7 +1,7 @@
 [project]
 name = "luca-agent-core"
-version = "0.1.0"
-description = "Add your description here"
+version = "0.2.0"
+description = "Core orchestration framework and API server for Luca AI agents"
 readme = "README.md"
 authors = [
     { name = "Luca", email = "luca.narbone@gmail.com" }
@@ -11,7 +11,6 @@ dependencies = [
     "fastapi>=0.141.1",
     "langchain-core>=1.6.0",
     "langchain-google-genai>=4.3.6",
-    "langchain-openai>=1.6.0",
     "langgraph>=1.2.11",
     "pydantic-settings>=2.15.0",
     "python-dotenv>=1.2.3",

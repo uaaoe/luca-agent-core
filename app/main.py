@@ -1,4 +1,6 @@
+import importlib.metadata
 import json
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,14 +11,30 @@ from app.agent import stream_agent_execution
 from app.config import settings
 from app.tools.registry import registry
 
-# Ensure tools are auto-discovered
-registry.auto_discover()
+try:
+    APP_VERSION = importlib.metadata.version("luca-agent-core")
+except importlib.metadata.PackageNotFoundError:
+    APP_VERSION = "0.2.0"
 
-app = FastAPI(title="Luca Agent Core", version="0.2.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Validate critical configuration at startup
+    settings.validate_api_keys()
+    # Discover all tools dynamically on startup
+    registry.auto_discover()
+    yield
+
+
+app = FastAPI(
+    title="Luca Agent Core",
+    version=APP_VERSION,
+    lifespan=lifespan,
+)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -32,7 +50,11 @@ class StreamRequest(BaseModel):
 
 @app.get("/health")
 def health_check():
-    return {"status": "ok", "app": "luca-agent-core", "provider": settings.llm_provider}
+    return {
+        "status": "ok",
+        "app": "luca-agent-core",
+        "model": settings.model_name,
+    }
 
 
 @app.get("/tools")

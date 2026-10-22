@@ -16,15 +16,14 @@ from app.tools.registry import registry
 # Discover all tools dynamically on startup
 registry.auto_discover()
 
-# ---------------------------------------------------------------------------
-# 1. Gemini LLM Initialization
-# ---------------------------------------------------------------------------
-llm = ChatGoogleGenerativeAI(
-    model="gemini-3.5-flash-lite",
-    google_api_key=settings.google_api_key,
-    max_retries=2,
-    request_timeout=15.0,
-)
+def get_llm():
+    """Initialize the Gemini LLM instance with dynamic configuration."""
+    return ChatGoogleGenerativeAI(
+        model=settings.model_name,
+        google_api_key=settings.google_api_key,
+        max_retries=2,
+        request_timeout=15.0,
+    )
 
 
 def resolve_model(active_tools: Sequence[str] | None = None):
@@ -32,11 +31,12 @@ def resolve_model(active_tools: Sequence[str] | None = None):
     Bind tools to LLM if requested, otherwise return the raw LLM.
     Ensures zero tools are bound by default (strict opt-in).
     """
+    model = get_llm()
     if active_tools:
         selected_tools = registry.get_tools(active_tools)
         if selected_tools:
-            return llm.bind_tools(selected_tools)
-    return llm
+            return model.bind_tools(selected_tools)
+    return model
 
 
 # ---------------------------------------------------------------------------
