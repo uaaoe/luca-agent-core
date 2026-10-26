@@ -1,5 +1,6 @@
 from langchain_core.tools import tool
 
+from app.tools._safe_expr import evaluate
 from app.tools.registry import registry
 
 
@@ -11,18 +12,13 @@ def calculate_metric(expression: str) -> str:
     assert expression and isinstance(expression, str), "Sanity Check: Expression must be a non-empty string"
 
     try:
-        allowed = {"__builtins__": {}}
-        result = eval(expression, allowed, {})
+        result = evaluate(expression)
         return f"Calculation result: {result}"
     except (
         ArithmeticError,
-        AttributeError,
-        IndexError,
-        KeyError,
-        NameError,
-        RecursionError,
-        SyntaxError,
         TypeError,
         ValueError,
     ) as exc:
+        # ValueError covers UnsafeExpressionError, which is raised for
+        # anything outside the arithmetic allow-list.
         return f"Calculation error: {exc!s}"

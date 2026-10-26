@@ -25,6 +25,9 @@ jobs:
       - name: Lint
         run: uvx ruff check .
 
+      - name: Unit tests
+        run: uv run pytest -q
+
       - name: Import and tool-registry check
         run: |
           uv run python -c "
