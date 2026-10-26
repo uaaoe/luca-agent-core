@@ -20,9 +20,18 @@ dependencies = [
 [project.scripts]
 luca-agent-core = "luca_agent_core:main"
 
+[dependency-groups]
+dev = [
+    "pytest>=8.4.2",
+]
+
 [build-system]
 requires = ["uv_build>=0.12.6,<0.13.0"]
 build-backend = "uv_build"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
 
 [tool.pyrefly]
 search-path = ["."]
