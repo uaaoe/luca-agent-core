@@ -1,9 +1,30 @@
 import json
+import os
 from contextlib import suppress
 from typing import Any
 
+from dotenv import load_dotenv
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Export .env variables to os.environ for LangSmith / LangChain tracing
+load_dotenv()
+
+# Automatically configure LangSmith / LangChain tracing environment
+if not os.environ.get("LANGSMITH_PROJECT") and os.environ.get("LANGSMITH_AGENT_ID"):
+    agent_id = os.environ["LANGSMITH_AGENT_ID"]
+    env = os.environ.get("LANGSMITH_AGENT_ENVIRONMENT") or os.environ.get("APP_ENV", "development")
+    os.environ["LANGSMITH_PROJECT"] = f"{agent_id}-{env}"
+
+# Mirror LANGSMITH_* and LANGCHAIN_* for complete SDK compatibility
+if os.environ.get("LANGSMITH_TRACING") and not os.environ.get("LANGCHAIN_TRACING_V2"):
+    os.environ["LANGCHAIN_TRACING_V2"] = os.environ["LANGSMITH_TRACING"]
+if os.environ.get("LANGSMITH_API_KEY") and not os.environ.get("LANGCHAIN_API_KEY"):
+    os.environ["LANGCHAIN_API_KEY"] = os.environ["LANGSMITH_API_KEY"]
+if os.environ.get("LANGSMITH_PROJECT") and not os.environ.get("LANGCHAIN_PROJECT"):
+    os.environ["LANGCHAIN_PROJECT"] = os.environ["LANGSMITH_PROJECT"]
+if os.environ.get("LANGSMITH_ENDPOINT") and not os.environ.get("LANGCHAIN_ENDPOINT"):
+    os.environ["LANGCHAIN_ENDPOINT"] = os.environ["LANGSMITH_ENDPOINT"]
 
 
 class Settings(BaseSettings):
