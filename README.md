@@ -94,10 +94,11 @@ To enable tracing, set the following environment variables in `.env`:
 LANGSMITH_TRACING=true
 LANGSMITH_ENDPOINT=https://api.smith.langchain.com
 LANGSMITH_API_KEY=your-langsmith-api-key
-LANGSMITH_PROJECT=luca-agent-core-development
+LANGSMITH_AGENT_ID=luca-agent-core
+LANGSMITH_AGENT_ENVIRONMENT=development
 ```
 
-> **Tip:** If `LANGSMITH_PROJECT` is omitted, the application automatically constructs it from `LANGSMITH_AGENT_ID` and `LANGSMITH_AGENT_ENVIRONMENT` (or `APP_ENV`), formatting it as `<LANGSMITH_AGENT_ID>-<LANGSMITH_AGENT_ENVIRONMENT>` (e.g. `luca-agent-core-development`).
+> **Note:** Tracing is configured using LangSmith's native Agent-centric view via `LANGSMITH_AGENT_ID` and `LANGSMITH_AGENT_ENVIRONMENT`. When addressing runs by agent, do not specify `LANGSMITH_PROJECT`. This requires `langchain-core>=1.6.11` to prevent default session conflicts.
 
 ## Docker
 
