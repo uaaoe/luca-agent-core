@@ -2,8 +2,12 @@ import json
 from contextlib import suppress
 from typing import Any
 
+from dotenv import load_dotenv
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Export .env variables to os.environ for LangSmith tracing
+load_dotenv()
 
 
 class Settings(BaseSettings):

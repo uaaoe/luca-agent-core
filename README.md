@@ -84,6 +84,22 @@ def get_crypto_price(symbol: str) -> str:
     return f"Current price of {symbol.upper()}: $65,000 USD"
 ```
 
+## Observability & Tracing
+
+Luca Agent Core natively supports tracing and observability with [LangSmith](https://smith.langchain.com/). When enabled, the LangGraph runtime automatically instruments the entire execution lifecycle—including graph transitions, agent nodes, tool executions, and Gemini LLM calls.
+
+To enable tracing, set the following environment variables in `.env`:
+
+```bash
+LANGSMITH_TRACING=true
+LANGSMITH_ENDPOINT=https://api.smith.langchain.com
+LANGSMITH_API_KEY=your-langsmith-api-key
+LANGSMITH_AGENT_ID=luca-agent-core
+LANGSMITH_AGENT_ENVIRONMENT=development
+```
+
+> **Note:** Tracing is configured using LangSmith's native Agent-centric view via `LANGSMITH_AGENT_ID` and `LANGSMITH_AGENT_ENVIRONMENT`. When addressing runs by agent, do not specify `LANGSMITH_PROJECT`. This requires `langchain-core>=1.6.11` to prevent default session conflicts.
+
 ## Docker
 
 ```bash
