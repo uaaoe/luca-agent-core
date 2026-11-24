@@ -24,6 +24,7 @@ luca-agent-core = "luca_agent_core:main"
 [dependency-groups]
 dev = [
     "pytest>=8.4.2",
+    "ruff>=0.17.6",
 ]
 
 [build-system]
