@@ -867,7 +867,6 @@ dependencies = [
     { name = "langchain-google-genai" },
     { name = "langgraph" },
     { name = "pydantic-settings" },
-    { name = "pytest-cov" },
     { name = "python-dotenv" },
     { name = "uvicorn", extra = ["standard"] },
 ]
@@ -875,6 +874,7 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "pytest" },
+    { name = "pytest-cov" },
     { name = "ruff" },
 ]
 
@@ -885,7 +885,6 @@ requires-dist = [
     { name = "langchain-google-genai", specifier = ">=4.3.6" },
     { name = "langgraph", specifier = ">=1.2.20" },
     { name = "pydantic-settings", specifier = ">=2.15.0" },
-    { name = "pytest-cov", specifier = ">=7.1.0" },
     { name = "python-dotenv", specifier = ">=1.2.3" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.52.4" },
 ]
@@ -893,6 +892,7 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "pytest", specifier = ">=8.4.2" },
+    { name = "pytest-cov", specifier = ">=7.1.0" },
     { name = "ruff", specifier = ">=0.17.6" },
 ]
 
