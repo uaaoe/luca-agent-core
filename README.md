@@ -4,14 +4,9 @@ A FastAPI backend that runs a LangGraph agent on Gemini and streams its output o
 
 ## Status
 
-**Active prototype.** The core loop works end to end, but it is not production-hardened. Planned work is tracked in the issues:
+**Active prototype.** The core loop works end to end, but it is not production-hardened.
 
-| Area | Issue | Status |
-|------|-------|--------|
-| Per-session isolation (no shared default `thread_id`) | [#5](../../issues/5) | Planned |
-| Configurable CORS origins | [#6](../../issues/6) | Planned |
-| Config validation, `.env.example`, cleanup | [#7](../../issues/7) | Completed |
-| Safe expression evaluation in `calculate_metric` | [#4](../../issues/4) | Completed |
+Known issues, planned improvements and development priorities are tracked in [GitHub Issues](../../issues).
 
 **Limitations:** history is in memory (lost on restart); `get_weather_forecast` is a stub returning a fixed value; only Gemini is wired up; `/stream` has no authentication.
 
