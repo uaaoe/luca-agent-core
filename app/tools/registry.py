@@ -38,12 +38,12 @@ class ToolRegistry:
         """
         Retrieve tools from the registry.
 
-        If names is provided, returns tools matching the requested names.
-        Otherwise, returns all registered tools.
+        Return matching tools once per requested name, in first-seen order.
+        Skip unknown names. If names is None, return all registered tools.
         """
         if names is None:
             return list(self._tools.values())
-        return [self._tools[name] for name in names if name in self._tools]
+        return [self._tools[name] for name in dict.fromkeys(names) if name in self._tools]
 
     def list_tools(self) -> list[str]:
         """Return a list of all registered tool names."""
