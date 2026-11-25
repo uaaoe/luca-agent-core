@@ -4,12 +4,12 @@ from app import agent
 from app.tools.registry import ToolRegistry
 
 
-def tool1():
-    """ A docstring """
+def tool1() -> bool:
+    """ Tool1 docstring """
     return True
 
-def tool2():
-    """ A docstring """
+def tool2() -> bool:
+    """ Tool2 docstring """
     return True
 
 def test_duplicate_resolved_tools(monkeypatch):
