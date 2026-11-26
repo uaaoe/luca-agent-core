@@ -6,6 +6,7 @@ from collections.abc import Sequence
 from typing import Any
 
 from langchain_core.tools import BaseTool, tool
+from langchain_core.utils.pydantic import model_json_schema
 
 
 class ToolRegistry:
@@ -43,7 +44,9 @@ class ToolRegistry:
         """
         if names is None:
             return list(self._tools.values())
-        return [self._tools[name] for name in dict.fromkeys(names) if name in self._tools]
+        return [
+            self._tools[name] for name in dict.fromkeys(names) if name in self._tools
+        ]
 
     def list_tools(self) -> list[str]:
         """Return a list of all registered tool names."""
@@ -68,11 +71,13 @@ class ToolRegistry:
         manifest: list[dict[str, Any]] = []
         for tool_instance in self._tools.values():
             parameters: dict[str, Any] = {}
-            if tool_instance.args_schema is not None:
-                if hasattr(tool_instance.args_schema, "model_json_schema"):
-                    parameters = tool_instance.args_schema.model_json_schema()
-                elif hasattr(tool_instance.args_schema, "schema"):
-                    parameters = tool_instance.args_schema.schema()
+            args_schema = tool_instance.args_schema
+
+            if isinstance(args_schema, dict):
+                parameters = args_schema
+            elif args_schema is not None:
+                # LangChain supports Pydantic v1 and v2 model classes.
+                parameters = model_json_schema(args_schema)
 
             manifest.append(
                 {
@@ -96,7 +101,9 @@ class ToolRegistry:
         if not package_path:
             return
 
-        for _, module_name, is_pkg in pkgutil.iter_modules(package_path, prefix=f"{package_name}."):
+        for _, module_name, is_pkg in pkgutil.iter_modules(
+            package_path, prefix=f"{package_name}."
+        ):
             # Avoid importing registry itself or private modules
             short_name = module_name.split(".")[-1]
             if short_name.startswith("_") or short_name == "registry":
