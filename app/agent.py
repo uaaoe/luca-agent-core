@@ -99,7 +99,7 @@ async def execute_tools(state: AgentState):
         for idx, res in enumerate(results):
             if isinstance(res, ToolMessage):
                 tool_messages.append(res)
-            if isinstance(res, Exception):
+            elif isinstance(res, Exception):
                 call = last_message.tool_calls[idx]
                 tool_messages.append(
                     ToolMessage(
