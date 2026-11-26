@@ -128,6 +128,10 @@ def should_continue(state: AgentState) -> Literal["tools", "__end__"]:
 # ---------------------------------------------------------------------------
 # 3. Assemble Graph with In-Memory Checkpointer
 # ---------------------------------------------------------------------------
+
+# Pyrefly 1.5.0 still rejects TypedDict state against LangGraph's StateT bound,
+# including LangGraph's own MessagesState. Recheck this ignore on upgrade.
+# https://github.com/pyrefly-org/pyrefly/issues/3745
 workflow = StateGraph(AgentState)  # type: ignore[bad-specialization]
 
 workflow.add_node("agent", call_model)
