@@ -16,6 +16,7 @@ from app.tools.registry import registry
 # Discover all tools dynamically on startup
 registry.auto_discover()
 
+
 def get_llm():
     """Initialize the Gemini LLM instance with dynamic configuration."""
     return ChatGoogleGenerativeAI(
@@ -63,6 +64,7 @@ async def execute_tools(state: AgentState):
     tool_messages: list[ToolMessage] = []
 
     if isinstance(last_message, AIMessage) and last_message.tool_calls:
+
         async def run_single_tool(call: dict[str, Any]) -> ToolMessage:
             tool_name = call["name"]
             tool_args = call.get("args", {})
@@ -91,10 +93,12 @@ async def execute_tools(state: AgentState):
                     tool_call_id=tool_id,
                 )
 
-        tasks = [run_single_tool(call) for call in last_message.tool_calls]
+        tasks = [run_single_tool(dict(call)) for call in last_message.tool_calls]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         for idx, res in enumerate(results):
+            if isinstance(res, ToolMessage):
+                tool_messages.append(res)
             if isinstance(res, Exception):
                 call = last_message.tool_calls[idx]
                 tool_messages.append(
@@ -104,8 +108,6 @@ async def execute_tools(state: AgentState):
                         tool_call_id=call.get("id"),
                     )
                 )
-            else:
-                tool_messages.append(res)
 
     return {"messages": tool_messages}
 
@@ -115,7 +117,9 @@ def should_continue(state: AgentState) -> Literal["tools", "__end__"]:
     last_message = state["messages"][-1]
 
     # Check if there are explicit tool calls requested
-    if isinstance(last_message, AIMessage) and bool(getattr(last_message, "tool_calls", None)):
+    if isinstance(last_message, AIMessage) and bool(
+        getattr(last_message, "tool_calls", None)
+    ):
         return "tools"
 
     return "__end__"
@@ -139,7 +143,9 @@ agent_app = workflow.compile(checkpointer=checkpointer)
 # --- Sanity Assertions on Compiled Graph ---
 expected_nodes = {"agent", "tools"}
 actual_nodes = set(agent_app.nodes.keys())
-assert expected_nodes.issubset(actual_nodes), f"Graph missing required nodes! Found: {actual_nodes}"
+assert expected_nodes.issubset(actual_nodes), (
+    f"Graph missing required nodes! Found: {actual_nodes}"
+)
 
 
 # ---------------------------------------------------------------------------
@@ -183,9 +189,7 @@ async def stream_agent_execution(
     input_message = HumanMessage(content=user_query)
 
     async for event in agent_app.astream(
-        {"messages": [input_message]},
-        config=config,
-        stream_mode="updates"
+        {"messages": [input_message]}, config=config, stream_mode="updates"
     ):
         for state_update in event.values():
             messages = state_update.get("messages", [])
@@ -194,25 +198,22 @@ async def stream_agent_execution(
                 # 1. Agent initiated tool call(s)
                 if isinstance(msg, AIMessage) and msg.tool_calls:
                     for call in msg.tool_calls:
-                        yield json.dumps({
-                            "type": "tool_call",
-                            "tool": call["name"],
-                            "args": call["args"]
-                        })
+                        yield json.dumps(
+                            {
+                                "type": "tool_call",
+                                "tool": call["name"],
+                                "args": call["args"],
+                            }
+                        )
 
                 # 2. Tool executed and returned output
                 elif isinstance(msg, ToolMessage):
-                    yield json.dumps({
-                        "type": "tool_result",
-                        "tool": msg.name,
-                        "output": msg.content
-                    })
+                    yield json.dumps(
+                        {"type": "tool_result", "tool": msg.name, "output": msg.content}
+                    )
 
                 # 3. Agent generated final conversational answer
                 elif isinstance(msg, AIMessage):
                     clean_text = extract_clean_text(msg.content)
                     if clean_text:
-                        yield json.dumps({
-                            "type": "message",
-                            "content": clean_text
-                        })
+                        yield json.dumps({"type": "message", "content": clean_text})
